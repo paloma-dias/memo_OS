@@ -100,13 +100,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // --- FUNÇÃO SIGNUP CORRIGIDA ---
   const signUp = async (email: string, password: string, nome: string, role: "admin" | "operador") => {
     try {
+      // 1. Criar o usuário na auth
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { nome },
+          data: { nome }, 
           emailRedirectTo: `${window.location.origin}/`,
         },
       });
@@ -114,12 +116,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
       if (!data.user) throw new Error("Erro ao criar usuário");
 
-      await supabase
+      // 2. Inserir o 'perfil' PRIMEIRO
+      // (Isto corrige o erro "foreign key")
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          id: data.user.id, // O 'id' do usuário
+          nome: nome,       // O 'nome' vindo do formulário
+          email: email      // O 'email' que faltava (corrigindo o erro de TS)
+        });
+
+      // Se falhar aqui, é porque o ID já existe (erro "duplicate key")
+      if (profileError) throw profileError; 
+
+      // 3. Inserir a 'role' DEPOIS
+      // Agora isso vai funcionar, pois o perfil (profiles.id) já existe
+      const { error: roleError } = await supabase
         .from("user_roles")
         .insert({
           user_id: data.user.id,
           role: role,
         });
+
+      if (roleError) throw roleError;
+
+      // --- FIM DA CORREÇÃO ---
 
       toast({
         title: "Cadastro realizado!",
