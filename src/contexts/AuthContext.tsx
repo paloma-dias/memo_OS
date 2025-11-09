@@ -17,7 +17,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] =useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<"admin" | "operador" | null>(null);
   const [userName, setUserName] = useState("");
@@ -100,33 +100,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // --- FUNÇÃO SIGNUP CORRIGIDA COM "UPSERT" ---
+ // --- FUNÇÃO SIGNUP CORRIGIDA ---
   const signUp = async (email: string, password: string, nome: string, role: "admin" | "operador") => {
     try {
       // 1. Criar o usuário na auth
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: { nome }, 
+          emailRedirectTo: `${window.location.origin}/`,
+        },
       });
 
       if (error) throw error;
       if (!data.user) throw new Error("Erro ao criar usuário");
 
-      // 2. Usar "UPSERT" no perfil
-      // Isso irá INSERIR se for novo, ou ATUALIZAR se já existir (por trigger/banco sujo)
-      // Resolvendo o erro "duplicate key"
+      // 2. Inserir o 'perfil' PRIMEIRO
+      // (Isto corrige o erro "foreign key")
       const { error: profileError } = await supabase
         .from("profiles")
-        .upsert({
-          id: data.user.id, // O 'id' para bater
-          nome: nome,       // O 'nome' para atualizar/inserir
-          email: email      // O 'email' para atualizar/inserir
+        .insert({
+          id: data.user.id, // O 'id' do usuário
+          nome: nome,       // O 'nome' vindo do formulário
+          email: email      // O 'email'
         });
 
+      // Se falhar aqui, é porque o ID já existe (erro "duplicate key")
       if (profileError) throw profileError; 
 
-      // 3. Inserir a 'role'
-      // Isso deve funcionar agora que o 'profiles' com certeza existe
+      // 3. Inserir a 'role' DEPOIS
+      // Agora isso vai funcionar, pois o perfil (profiles.id) já existe
       const { error: roleError } = await supabase
         .from("user_roles")
         .insert({
