@@ -33,6 +33,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle, XCircle, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
+// --- CORREÇÃO DE TIPO (1/3) ---
+// 1. Definimos os tipos exatos que o banco de dados espera
+type CondicaoPagamento = "a_vista" | "parcelado" | "boleto" | "cartao";
+
+// 2. Definimos a interface para o nosso estado do formulário
+interface AprovacaoFormData {
+  condicao_pagamento: CondicaoPagamento | ""; // Permitimos "" para o estado inicial
+  motivo_cancelamento: string;
+}
+// --- FIM DA CORREÇÃO 1 ---
+
 export const Aprovacao = () => {
   const [ordensAguardando, setOrdensAguardando] = useState<any[]>([]);
   const [selectedOS, setSelectedOS] = useState<any>(null);
@@ -41,10 +52,13 @@ export const Aprovacao = () => {
   const { toast } = useToast();
   const { userRole } = useAuth();
 
-  const [formData, setFormData] = useState({
-    condicao_pagamento: "",
+  // --- CORREÇÃO DE TIPO (2/3) ---
+  // 3. Aplicamos a interface ao nosso useState
+  const [formData, setFormData] = useState<AprovacaoFormData>({
+    condicao_pagamento: "", // O estado inicial agora é válido
     motivo_cancelamento: "",
   });
+  // --- FIM DA CORREÇÃO 2 ---
 
   useEffect(() => {
     fetchOrdensAguardando();
@@ -65,7 +79,7 @@ export const Aprovacao = () => {
         .select(`
           *,
           clientes (nome, telefone),
-          profiles (nome),
+          tecnico: profiles!id_tecnico_principal (nome), 
           itens_os (
             quantidade,
             produtos (nome, codigo)
@@ -89,7 +103,8 @@ export const Aprovacao = () => {
     setSelectedOS(os);
     setModalType(type);
     setFormData({
-      condicao_pagamento: os.condicao_pagamento || "",
+      // Usamos 'as CondicaoPagamento' para garantir que o tipo seja correto
+      condicao_pagamento: (os.condicao_pagamento as CondicaoPagamento) || "",
       motivo_cancelamento: os.motivo_cancelamento || "",
     });
   };
@@ -106,7 +121,7 @@ export const Aprovacao = () => {
 
     setLoading(true);
     try {
-      // Atualizar OS para próximo status (aguardando_pecas)
+      // Agora o TypeScript sabe que 'formData.condicao_pagamento' é válido
       const { error } = await supabase
         .from("ordens_servico")
         .update({
@@ -137,6 +152,7 @@ export const Aprovacao = () => {
   };
 
   const handleRejeitar = async () => {
+    // ... (nenhuma mudança aqui) ...
     if (!formData.motivo_cancelamento) {
       toast({
         title: "Campo obrigatório",
@@ -148,12 +164,10 @@ export const Aprovacao = () => {
 
     setLoading(true);
     try {
-      // Atualizar OS com motivo de cancelamento
       const { error } = await supabase
         .from("ordens_servico")
         .update({
           motivo_cancelamento: formData.motivo_cancelamento,
-          // Manter status ou pode criar um status "cancelada" se necessário
         })
         .eq("id", selectedOS.id);
 
@@ -180,7 +194,8 @@ export const Aprovacao = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* ... (cabeçalho da página) ... */}
+       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Aprovação de OS</h1>
           <p className="text-muted-foreground">
@@ -194,6 +209,7 @@ export const Aprovacao = () => {
       </div>
 
       {ordensAguardando.length === 0 ? (
+        // ... (bloco "Tudo em dia!") ...
         <Card className="p-12 text-center">
           <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
           <h3 className="text-xl font-semibold mb-2">Tudo em dia!</h3>
@@ -202,6 +218,7 @@ export const Aprovacao = () => {
           </p>
         </Card>
       ) : (
+        // ... (bloco da tabela) ...
         <Card>
           <Table>
             <TableHeader>
@@ -224,7 +241,7 @@ export const Aprovacao = () => {
                       <p className="text-xs text-muted-foreground">{os.clientes?.telefone}</p>
                     </div>
                   </TableCell>
-                  <TableCell>{os.profiles?.nome || "-"}</TableCell>
+                  <TableCell>{os.tecnico?.nome || "-"}</TableCell>
                   <TableCell className="max-w-xs">
                     <p className="text-sm truncate">{os.laudo || "Sem laudo"}</p>
                   </TableCell>
@@ -261,6 +278,7 @@ export const Aprovacao = () => {
       {/* Modal de Aprovação */}
       <Dialog open={modalType === "aprovar"} onOpenChange={() => setModalType(null)}>
         <DialogContent>
+          {/* ... (conteúdo do modal) ... */}
           <DialogHeader>
             <DialogTitle>Aprovar Ordem de Serviço</DialogTitle>
             <DialogDescription>
@@ -290,7 +308,10 @@ export const Aprovacao = () => {
               </Label>
               <Select
                 value={formData.condicao_pagamento}
-                onValueChange={(value) => setFormData({ ...formData, condicao_pagamento: value })}
+                // --- CORREÇÃO DE TIPO (3/3) ---
+                // Fazemos um "cast" para o TypeScript saber que
+                // o 'value' (string) é do tipo 'CondicaoPagamento'
+                onValueChange={(value) => setFormData({ ...formData, condicao_pagamento: value as CondicaoPagamento })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
@@ -319,6 +340,7 @@ export const Aprovacao = () => {
 
       {/* Modal de Rejeição */}
       <Dialog open={modalType === "rejeitar"} onOpenChange={() => setModalType(null)}>
+        {/* ... (nenhuma mudança aqui) ... */}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rejeitar/Cancelar Ordem de Serviço</DialogTitle>
