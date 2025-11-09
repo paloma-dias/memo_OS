@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // --- FUNÇÃO SIGNUP CORRIGIDA ---
+ // --- FUNÇÃO SIGNUP CORRIGIDA ---
   const signUp = async (email: string, password: string, nome: string, role: "admin" | "operador") => {
     try {
       // 1. Criar o usuário na auth
@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .insert({
           id: data.user.id, // O 'id' do usuário
           nome: nome,       // O 'nome' vindo do formulário
-          email: email      // O 'email' que faltava (corrigindo o erro de TS)
+          email: email      // O 'email'
         });
 
       // Se falhar aqui, é porque o ID já existe (erro "duplicate key")
